@@ -18,6 +18,8 @@ class DeviceResult {
     this.labels = const [],
     this.note,
     this.rtspUrl,
+    this.rtspOk,
+    this.authProfileName,
     this.error,
   });
 
@@ -39,6 +41,8 @@ class DeviceResult {
   final List<String> labels;
   final String? note;
   final String? rtspUrl;
+  final bool? rtspOk;
+  final String? authProfileName;
   final String? error;
 
   String get id => '$source|$ip|$port|${serialNumber ?? ''}';
@@ -67,6 +71,8 @@ class DeviceResult {
     List<String>? labels,
     String? note,
     String? rtspUrl,
+    bool? rtspOk,
+    String? authProfileName,
     String? error,
   }) {
     return DeviceResult(
@@ -88,6 +94,8 @@ class DeviceResult {
       labels: labels ?? this.labels,
       note: note ?? this.note,
       rtspUrl: rtspUrl ?? this.rtspUrl,
+      rtspOk: rtspOk ?? this.rtspOk,
+      authProfileName: authProfileName ?? this.authProfileName,
       error: error ?? this.error,
     );
   }
@@ -111,6 +119,8 @@ class DeviceResult {
         'labels': labels,
         'note': note,
         'rtspUrl': rtspUrl,
+        'rtspOk': rtspOk,
+        'authProfileName': authProfileName,
         'error': error,
       };
 
@@ -134,6 +144,8 @@ class DeviceResult {
       labels: (json['labels'] as List? ?? const []).map((e) => e.toString()).toList(),
       note: json['note']?.toString(),
       rtspUrl: json['rtspUrl']?.toString(),
+      rtspOk: json['rtspOk'] is bool ? json['rtspOk'] as bool : null,
+      authProfileName: json['authProfileName']?.toString(),
       error: json['error']?.toString(),
     );
   }
@@ -157,6 +169,8 @@ class DeviceResult {
         labels.join(' | '),
         note ?? '',
         rtspUrl ?? '',
+        rtspOk == null ? '' : (rtspOk! ? 'OK' : 'NIE'),
+        authProfileName ?? '',
         error ?? '',
       ];
 
@@ -179,6 +193,8 @@ class DeviceResult {
         'labels',
         'note',
         'rtspUrl',
+        'rtspStatus',
+        'authProfileName',
         'error',
       ];
 }
