@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../models/auth_profile.dart';
 import '../models/device_result.dart';
 import 'onvif_service.dart';
+import 'rtsp_service.dart';
 
 class LanScannerService {
-  LanScannerService({OnvifService? onvifService})
-      : _onvifService = onvifService ?? OnvifService();
+  LanScannerService({OnvifService? onvifService, RtspService? rtspService})
+      : _onvifService = onvifService ?? OnvifService(),
+        _rtspService = rtspService ?? RtspService();
 
   final OnvifService _onvifService;
+  final RtspService _rtspService;
 
   static const defaultPorts = [80, 8080, 8000, 8899, 554];
 
@@ -16,6 +20,7 @@ class LanScannerService {
     required String cidr,
     List<int> ports = defaultPorts,
     int concurrency = 64,
+    List<AuthProfile> authProfiles = const [],
     void Function(DeviceResult result)? onResult,
   }) async {
     final ips = _expandCidr24(cidr);
@@ -24,6 +29,7 @@ class LanScannerService {
 
     final subscriptions = <Future<void>>[];
     final iterator = StreamIterator(queue);
+    final workerCount = concurrency.clamp(1, 256);
 
     Future<void> worker() async {
       while (await iterator.moveNext()) {
@@ -32,21 +38,27 @@ class LanScannerService {
           final isOpen = await _isTcpOpen(ip, port);
           if (!isOpen) continue;
 
-          final onvif = await _onvifService.getDeviceInformation(ip, port);
-          final result = onvif ??
-              DeviceResult(
-                ip: ip,
-                port: port,
-                protocol: port == 554 ? 'RTSP/TCP' : 'TCP',
-                source: 'LAN',
-              );
+          final onvif = await _onvifService.getDeviceInformation(
+            ip,
+            port,
+            authProfiles: authProfiles,
+          );
+          final rtspOk = port == 554 ? await _rtspService.testRtsp(ip) : null;
+          final result = (onvif ??
+                  DeviceResult(
+                    ip: ip,
+                    port: port,
+                    protocol: port == 554 ? 'RTSP/TCP' : 'TCP',
+                    source: 'LAN',
+                  ))
+              .copyWith(rtspOk: rtspOk);
           results.add(result);
           onResult?.call(result);
         }
       }
     }
 
-    for (var i = 0; i < concurrency; i++) {
+    for (var i = 0; i < workerCount; i++) {
       subscriptions.add(worker());
     }
     await Future.wait(subscriptions);
