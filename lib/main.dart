@@ -236,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(controller: labelController, decoration: const InputDecoration(labelText: 'Etykiety', hintText: 'np. Dahua, magazyn')),
             TextField(controller: noteController, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Notatka')),
-            TextField(controller: rtspController, decoration: const InputDecoration(labelText: 'Adres RTSP')),
+            TextField(controller: rtspController, decoration: const InputDecoration(labelText: 'Adres RTSP / link')),
           ]),
         ),
         actions: [
@@ -316,13 +316,32 @@ class _HomeScreenState extends State<HomeScreen> {
     await _storage.saveAuthProfiles(_authProfiles);
   }
 
+  Future<void> _openExternal(String rawUrl) async {
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri == null || !uri.hasScheme) {
+      setState(() => _status = 'Nieprawidłowy link: $rawUrl');
+      return;
+    }
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) setState(() => _status = 'Nie udało się otworzyć linku: $rawUrl');
+  }
+
+  Future<void> _openWeb(DeviceResult result) async {
+    final scheme = result.port == 443 ? 'https' : 'http';
+    await _openExternal('$scheme://${result.ip}:${result.port}/');
+  }
+
+  Future<void> _openRtsp(DeviceResult result) async {
+    final url = result.rtspUrl?.trim().isNotEmpty == true ? result.rtspUrl!.trim() : 'rtsp://${result.ip}:554/';
+    await _openExternal(url);
+  }
+
   Future<void> _openMap(DeviceResult result) async {
     if (!result.hasLocation) {
       setState(() => _status = 'Ten wynik nie ma współrzędnych lokalizacji.');
       return;
     }
-    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${result.latitude},${result.longitude}');
-    await launchUrl(url, mode: LaunchMode.externalApplication);
+    await _openExternal('https://www.google.com/maps/search/?api=1&query=${result.latitude},${result.longitude}');
   }
 
   Future<void> _saveCurrentQuery() async {
@@ -332,10 +351,12 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Zapisz zapytanie Shodan'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nazwa')),
-          TextField(controller: queryController, decoration: const InputDecoration(labelText: 'Zapytanie')),
-        ]),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nazwa')),
+            TextField(controller: queryController, decoration: const InputDecoration(labelText: 'Zapytanie')),
+          ]),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Anuluj')),
           FilledButton(onPressed: () => Navigator.pop(context, ShodanQuery(name: nameController.text.trim(), query: queryController.text.trim())), child: const Text('Zapisz')),
@@ -486,31 +507,30 @@ class _HomeScreenState extends State<HomeScreen> {
       ]);
 
   Widget _buildTabBody({required Widget top, required List<DeviceResult> list, bool showMap = false, bool cameraMode = false}) {
-    return Padding(
+    return ListView(
       padding: const EdgeInsets.all(12),
-      child: Column(children: [
+      children: [
         top,
         const Divider(height: 24),
-        Expanded(
-          child: list.isEmpty
-              ? const Center(child: Text('Brak wyników'))
-              : ListView.builder(
-                  itemCount: list.length,
-                  itemBuilder: (context, index) {
-                    final result = list[index];
-                    return Column(children: [
-                      DeviceResultTile(result: result),
-                      Wrap(spacing: 8, children: [
-                        TextButton.icon(onPressed: () => _toggleFavorite(result), icon: Icon(result.favorite ? Icons.star : Icons.star_border), label: Text(result.favorite ? 'Usuń z ulubionych' : 'Ulubione')),
-                        TextButton.icon(onPressed: () => _editDevice(result), icon: const Icon(Icons.edit_note), label: const Text('Notatki / etykiety')),
-                        if (showMap || result.hasLocation) TextButton.icon(onPressed: () => _openMap(result), icon: const Icon(Icons.map), label: const Text('Mapa')),
-                        if (cameraMode || result.port == 554) TextButton.icon(onPressed: () => _testRtsp(result), icon: const Icon(Icons.network_check), label: Text(result.rtspOk == true ? 'RTSP OK' : 'Test RTSP')),
-                      ]),
-                    ]);
-                  },
-                ),
-        ),
-      ]),
+        if (list.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: Center(child: Text('Brak wyników')),
+          )
+        else
+          ...list.map((result) => Column(children: [
+                DeviceResultTile(result: result),
+                Wrap(spacing: 8, runSpacing: 4, children: [
+                  TextButton.icon(onPressed: () => _toggleFavorite(result), icon: Icon(result.favorite ? Icons.star : Icons.star_border), label: Text(result.favorite ? 'Usuń z ulubionych' : 'Ulubione')),
+                  TextButton.icon(onPressed: () => _editDevice(result), icon: const Icon(Icons.edit_note), label: const Text('Notatki / etykiety')),
+                  TextButton.icon(onPressed: () => _openWeb(result), icon: const Icon(Icons.open_in_browser), label: const Text('WWW')),
+                  if (showMap || result.hasLocation) TextButton.icon(onPressed: () => _openMap(result), icon: const Icon(Icons.map), label: const Text('Mapa')),
+                  if (cameraMode || result.port == 554) TextButton.icon(onPressed: () => _testRtsp(result), icon: const Icon(Icons.network_check), label: Text(result.rtspOk == true ? 'RTSP OK' : 'Test RTSP')),
+                  if (cameraMode || result.rtspUrl != null || result.port == 554) TextButton.icon(onPressed: () => _openRtsp(result), icon: const Icon(Icons.play_circle), label: const Text('Otwórz RTSP')),
+                ]),
+                const SizedBox(height: 8),
+              ])),
+      ],
     );
   }
 }
