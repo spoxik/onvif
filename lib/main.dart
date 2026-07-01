@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _portsController = TextEditingController(text: '80,8080,8000,8899,554');
   final _apiKeyController = TextEditingController();
   final _queryController = TextEditingController(text: 'product:camera country:PL');
+  final _serialController = TextEditingController();
   final _filterController = TextEditingController();
   final _concurrencyController = TextEditingController(text: '64');
 
@@ -99,6 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _portsController.dispose();
     _apiKeyController.dispose();
     _queryController.dispose();
+    _serialController.dispose();
     _filterController.dispose();
     _concurrencyController.dispose();
     super.dispose();
@@ -154,6 +156,46 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       setState(() => _status = 'Błąd Shodan: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _searchShodanSerial() async {
+    final serial = _serialController.text.trim();
+    if (serial.isEmpty) {
+      setState(() => _status = 'Wpisz numer seryjny do wyszukania.');
+      return;
+    }
+    final query = '"$serial"';
+    _queryController.text = query;
+    setState(() {
+      _busy = true;
+      _status = 'Szukam numeru seryjnego w Shodan: $serial';
+      _results.clear();
+    });
+
+    try {
+      if (_saveShodanKey) await _storage.saveApiKey(_apiKeyController.text);
+      final results = await _shodan.search(apiKey: _apiKeyController.text, query: query);
+      final filtered = results.where((r) {
+        final haystack = [
+          r.ip,
+          r.manufacturer,
+          r.model,
+          r.serialNumber,
+          r.firmwareVersion,
+          r.organization,
+          r.hostnames.join(' '),
+        ].whereType<String>().join(' ').toLowerCase();
+        return haystack.contains(serial.toLowerCase()) || r.serialNumber != null;
+      }).toList();
+      setState(() {
+        _results.addAll((filtered.isEmpty ? results : filtered).map(_mergeFavoriteState));
+        _status = 'Shodan SN: znaleziono ${_results.length} wyników dla $serial.';
+      });
+    } catch (e) {
+      setState(() => _status = 'Błąd Shodan SN: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -382,6 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ShodanQuery(name: 'Kamery w Polsce', query: 'product:camera country:PL'),
       ShodanQuery(name: 'RTSP w Polsce', query: 'port:554 country:PL'),
       ShodanQuery(name: 'ONVIF HTTP', query: 'onvif port:80 country:PL'),
+      ShodanQuery(name: 'Przykład SN', query: '"SERIAL_NUMBER_TUTAJ"'),
     ];
     setState(() {
       for (final q in examples) {
@@ -470,8 +513,20 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text('Używaj tylko do własnych/autoryzowanych zasobów. Wpisz własny klucz API Shodan.'),
           TextField(controller: _apiKeyController, obscureText: true, decoration: const InputDecoration(labelText: 'Shodan API key')),
           TextField(controller: _queryController, decoration: const InputDecoration(labelText: 'Zapytanie Shodan', hintText: 'np. product:camera country:PL')),
-          Wrap(spacing: 8, children: [
+          const SizedBox(height: 8),
+          TextField(
+            controller: _serialController,
+            decoration: const InputDecoration(
+              labelText: 'Serial Number',
+              hintText: 'np. 3H043D1PAJADF77',
+              prefixIcon: Icon(Icons.confirmation_number),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 4, children: [
             FilledButton.icon(onPressed: _busy ? null : _searchShodan, icon: const Icon(Icons.public), label: const Text('Szukaj')),
+            FilledButton.icon(onPressed: _busy ? null : _searchShodanSerial, icon: const Icon(Icons.confirmation_number), label: const Text('Szukaj SN')),
             OutlinedButton.icon(onPressed: _saveCurrentQuery, icon: const Icon(Icons.save), label: const Text('Zapisz zapytanie')),
             OutlinedButton.icon(onPressed: _exportQueries, icon: const Icon(Icons.upload_file), label: const Text('Eksport zapytań')),
             OutlinedButton.icon(onPressed: _importExampleQueries, icon: const Icon(Icons.download), label: const Text('Import przykładów')),
