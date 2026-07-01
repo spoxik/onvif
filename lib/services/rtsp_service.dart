@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 class RtspService {
@@ -11,7 +12,7 @@ class RtspService {
       socket.write('OPTIONS rtsp://$host:$port/ RTSP/1.0\r\nCSeq: 1\r\n\r\n');
       final response = await socket
           .cast<List<int>>()
-          .transform(const SystemEncoding().decoder)
+          .transform(utf8.decoder)
           .first
           .timeout(const Duration(seconds: 2));
       await socket.close();
