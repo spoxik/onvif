@@ -54,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _queryController = TextEditingController(text: 'product:camera country:PL');
   final _serialController = TextEditingController();
   final _filterController = TextEditingController();
+  final _resultSerialFilterController = TextEditingController();
   final _concurrencyController = TextEditingController(text: '64');
 
   final List<DeviceResult> _results = [];
@@ -70,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadLocalData();
     _filterController.addListener(() => setState(() {}));
+    _resultSerialFilterController.addListener(() => setState(() {}));
   }
 
   Future<void> _loadLocalData() async {
@@ -102,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _queryController.dispose();
     _serialController.dispose();
     _filterController.dispose();
+    _resultSerialFilterController.dispose();
     _concurrencyController.dispose();
     super.dispose();
   }
@@ -169,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final query = '"$serial"';
     _queryController.text = query;
+    _resultSerialFilterController.text = serial;
     setState(() {
       _busy = true;
       _status = 'Szukam numeru seryjnego w Shodan: $serial';
@@ -437,12 +441,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<DeviceResult> get _filteredResults {
     final q = _filterController.text.trim().toLowerCase();
-    final source = q.isEmpty ? _results : _results.where((r) {
-      final haystack = [r.ip, r.manufacturer, r.model, r.serialNumber, r.firmwareVersion, r.country, r.organization, r.labels.join(' '), r.note, r.authProfileName]
-          .whereType<String>()
-          .join(' ')
-          .toLowerCase();
-      return haystack.contains(q);
+    final sn = _resultSerialFilterController.text.trim().toLowerCase();
+    final source = _results.where((r) {
+      final generalHaystack = [
+        r.ip,
+        r.manufacturer,
+        r.model,
+        r.serialNumber,
+        r.firmwareVersion,
+        r.country,
+        r.organization,
+        r.labels.join(' '),
+        r.note,
+        r.authProfileName,
+      ].whereType<String>().join(' ').toLowerCase();
+
+      final serialHaystack = [
+        r.serialNumber,
+        r.hardwareId,
+        r.model,
+        r.manufacturer,
+      ].whereType<String>().join(' ').toLowerCase();
+
+      final generalOk = q.isEmpty || generalHaystack.contains(q);
+      final serialOk = sn.isEmpty || serialHaystack.contains(sn);
+      return generalOk && serialOk;
     }).toList();
     return List.unmodifiable(source);
   }
@@ -486,7 +509,25 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_busy) const LinearProgressIndicator(),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: TextField(controller: _filterController, decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_alt), labelText: 'Filtr: SN, model, producent, etykieta, IP', border: OutlineInputBorder())),
+            child: TextField(controller: _filterController, decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_alt), labelText: 'Filtr ogólny: model, producent, etykieta, IP', border: OutlineInputBorder())),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: TextField(
+              controller: _resultSerialFilterController,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.confirmation_number),
+                labelText: 'Filtr wyników po Serial Number',
+                hintText: 'Wpisz cały lub fragment numeru seryjnego',
+                border: const OutlineInputBorder(),
+                suffixIcon: _resultSerialFilterController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => _resultSerialFilterController.clear(),
+                      ),
+              ),
+            ),
           ),
           Expanded(child: TabBarView(children: [_buildLanTab(), _buildCamerasTab(), _buildShodanTab(), _buildFavoritesTab(), _buildSettingsTab()])),
           if (_status != null) Padding(padding: const EdgeInsets.all(12), child: Text(_status!)),
@@ -517,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
           TextField(
             controller: _serialController,
             decoration: const InputDecoration(
-              labelText: 'Serial Number',
+              labelText: 'Serial Number do wyszukania w Shodan',
               hintText: 'np. 3H043D1PAJADF77',
               prefixIcon: Icon(Icons.confirmation_number),
               border: OutlineInputBorder(),
