@@ -1,16 +1,51 @@
 # ONVIF Scanner
 
-Flutterowa aplikacja na Androida do audytu własnych sieci CCTV.
+Flutterowa aplikacja na Androida do audytu własnych sieci CCTV, ONVIF, RTSP oraz wyników z Shodan.
 
-## Funkcje
+## Zakładki
+
+### LAN
 
 - skanowanie podsieci LAN/VPN, np. `10.10.0.0/24` albo `192.168.1.0/24`,
 - sprawdzanie portów typowych dla kamer/NVR: `80`, `8080`, `8000`, `8899`, `554`,
 - podstawowe wykrywanie ONVIF przez `GetDeviceInformation`,
-- odczyt producenta, modelu, firmware i numeru seryjnego, jeśli urządzenie udostępnia te dane,
-- osobna zakładka Shodan z własnym kluczem API użytkownika,
-- eksport wyników do CSV,
-- interfejs po polsku.
+- odczyt producenta, modelu, firmware i numeru seryjnego, jeśli urządzenie udostępnia dane.
+
+### Kamery
+
+- widok urządzeń rozpoznanych jako ONVIF/RTSP,
+- szybkie dodawanie RTSP,
+- notatki do urządzeń,
+- etykiety, np. `Dahua`, `magazyn`, `klient A`,
+- dodawanie do ulubionych.
+
+### Shodan
+
+- wyszukiwanie przez własny klucz API Shodan,
+- zapis lokalny klucza API, opcjonalny,
+- zapisane zapytania Shodan,
+- import przykładowych zapytań,
+- eksport zapytań do JSON,
+- mapa lokalizacji hostów, jeśli Shodan zwróci współrzędne.
+
+### Ulubione
+
+- lokalna lista zapisanych urządzeń,
+- notatki, etykiety i RTSP przypisane do urządzenia,
+- szybki powrót do często używanych kamer/NVR.
+
+### Ustawienia
+
+- przełącznik zapisu klucza Shodan,
+- licznik ulubionych urządzeń,
+- licznik zapisanych zapytań Shodan,
+- przypomnienie o legalnym użyciu.
+
+## Eksport i raporty
+
+- eksport aktualnie filtrowanych wyników do CSV,
+- generowanie raportu PDF z wyników,
+- filtrowanie po IP, producencie, modelu, numerze seryjnym, etykiecie i notatce.
 
 ## Ważne
 
@@ -24,6 +59,13 @@ Jeżeli repozytorium nie ma jeszcze katalogów `android/`, `ios/`, `web/`, utwó
 flutter create --platforms=android .
 flutter pub get
 flutter run
+```
+
+Po aktualizacji zależności uruchom:
+
+```bash
+flutter clean
+flutter pub get
 ```
 
 Do zbudowania APK:
@@ -44,18 +86,24 @@ build/app/outputs/flutter-apk/app-release.apk
 lib/
   main.dart
   models/
+    device_result.dart
+    shodan_query.dart
   services/
-  screens/
+    export_service.dart
+    lan_scanner_service.dart
+    onvif_service.dart
+    report_service.dart
+    shodan_service.dart
+    storage_service.dart
   widgets/
+    device_result_tile.dart
 ```
 
-## Co dalej
+## Kolejne sensowne kroki
 
-Planowane kolejne moduły:
-
-- zapis historii skanowań,
-- podgląd RTSP,
+- prawdziwy podgląd RTSP w aplikacji,
 - PTZ ONVIF,
+- logowanie ONVIF WS-Security,
 - eksport XLSX,
-- filtrowanie Dahua/Hikvision/Uniview,
-- bezpieczne przechowywanie klucza API Shodan.
+- historia skanowań,
+- filtrowanie Dahua/Hikvision/Uniview osobnymi przełącznikami.
