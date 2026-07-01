@@ -44,6 +44,10 @@ class ShodanService {
           .toList();
       final opts = item['opts'] as Map<String, dynamic>?;
       final raw = item['data']?.toString() ?? '';
+      final product = item['product']?.toString();
+      final model = opts?['devicetype']?.toString();
+      final serial = _extractSerial(raw);
+      final isDahua = _looksLikeDahua(raw, product, model);
 
       return DeviceResult(
         ip: item['ip_str']?.toString() ?? '',
@@ -52,10 +56,10 @@ class ShodanService {
             ? ((item['_shodan'] as Map)['module']?.toString() ?? 'SHODAN')
             : 'SHODAN',
         source: 'Shodan',
-        manufacturer: item['product']?.toString(),
-        model: opts?['devicetype']?.toString(),
+        manufacturer: product ?? (isDahua ? 'Dahua' : null),
+        model: model,
         firmwareVersion: item['version']?.toString(),
-        serialNumber: _extractSerial(raw),
+        serialNumber: serial,
         country: location?['country_name']?.toString(),
         organization: item['org']?.toString(),
         hostnames: hostnames,
@@ -65,15 +69,35 @@ class ShodanService {
     }).toList();
   }
 
+  bool _looksLikeDahua(String raw, String? product, String? model) {
+    final value = [raw, product, model].whereType<String>().join(' ').toLowerCase();
+    return value.contains('dahua') ||
+        value.contains('dhi-') ||
+        value.contains('dh-ipc') ||
+        value.contains('ipc-hfw') ||
+        value.contains('ipc-hdbw') ||
+        value.contains('nvr4') ||
+        value.contains('nvr5');
+  }
+
   String? _extractSerial(String raw) {
     final patterns = <RegExp>[
-      RegExp(r'serial(?:\s*number)?["\s:=]+([A-Za-z0-9._-]{4,64})', caseSensitive: false),
       RegExp(r'"serial_number"\s*:\s*"([^"]+)"', caseSensitive: false),
+      RegExp(r'"serialNumber"\s*:\s*"([^"]+)"', caseSensitive: false),
       RegExp(r'"SerialNumber"\s*:\s*"([^"]+)"', caseSensitive: false),
+      RegExp(r'"serial"\s*:\s*"([^"]+)"', caseSensitive: false),
+      RegExp(r'serial\s*number\s*[:=\-]\s*([A-Za-z0-9._-]{4,80})', caseSensitive: false),
+      RegExp(r'serialnumber\s*[:=\-]\s*([A-Za-z0-9._-]{4,80})', caseSensitive: false),
+      RegExp(r'serial\s*[:=\-]\s*([A-Za-z0-9._-]{4,80})', caseSensitive: false),
+      RegExp(r'sn\s*[:=\-]\s*([A-Za-z0-9._-]{4,80})', caseSensitive: false),
+      RegExp(r'deviceid\s*[:=\-]\s*([A-Za-z0-9._-]{4,80})', caseSensitive: false),
     ];
     for (final pattern in patterns) {
       final match = pattern.firstMatch(raw);
-      if (match != null) return match.group(1);
+      if (match != null) {
+        final value = match.group(1)?.trim();
+        if (value != null && value.length >= 4) return value;
+      }
     }
     return null;
   }
