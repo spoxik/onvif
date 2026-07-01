@@ -59,6 +59,8 @@ class ShodanService {
         country: location?['country_name']?.toString(),
         organization: item['org']?.toString(),
         hostnames: hostnames,
+        latitude: double.tryParse(location?['latitude']?.toString() ?? ''),
+        longitude: double.tryParse(location?['longitude']?.toString() ?? ''),
       );
     }).toList();
   }
