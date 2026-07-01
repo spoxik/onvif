@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:xml/xml.dart';
 
+import '../models/auth_profile.dart';
 import '../models/device_result.dart';
 
 class OnvifService {
@@ -14,7 +17,37 @@ class OnvifService {
 
   final Dio _dio;
 
-  Future<DeviceResult?> getDeviceInformation(String ip, int port) async {
+  Future<DeviceResult?> getDeviceInformation(
+    String ip,
+    int port, {
+    List<AuthProfile> authProfiles = const [],
+  }) async {
+    final unauthenticated = await _tryGetDeviceInformation(ip, port);
+    if (unauthenticated != null && unauthenticated.error != 'ONVIF wymaga logowania') {
+      return unauthenticated;
+    }
+
+    for (final profile in authProfiles.where((p) => p.username.isNotEmpty)) {
+      final result = await _tryGetDeviceInformation(
+        ip,
+        port,
+        basicAuthHeader: _basicAuth(profile),
+        authProfileName: profile.name,
+      );
+      if (result != null && result.error != 'ONVIF wymaga logowania') {
+        return result;
+      }
+    }
+
+    return unauthenticated;
+  }
+
+  Future<DeviceResult?> _tryGetDeviceInformation(
+    String ip,
+    int port, {
+    String? basicAuthHeader,
+    String? authProfileName,
+  }) async {
     final uri = 'http://$ip:$port/onvif/device_service';
     const envelope = '''<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
@@ -30,6 +63,7 @@ class OnvifService {
         options: Options(
           contentType: 'application/soap+xml; charset=utf-8',
           responseType: ResponseType.plain,
+          headers: basicAuthHeader == null ? null : {'Authorization': basicAuthHeader},
           validateStatus: (status) => status != null && status < 500,
         ),
       );
@@ -41,6 +75,7 @@ class OnvifService {
           port: port,
           protocol: 'ONVIF',
           source: 'LAN',
+          authProfileName: authProfileName,
           error: 'ONVIF wymaga logowania',
         );
       }
@@ -63,9 +98,15 @@ class OnvifService {
         firmwareVersion: text('FirmwareVersion'),
         serialNumber: text('SerialNumber'),
         hardwareId: text('HardwareId'),
+        authProfileName: authProfileName,
       );
-    } catch (e) {
+    } catch (_) {
       return null;
     }
+  }
+
+  String _basicAuth(AuthProfile profile) {
+    final raw = '${profile.username}:${profile.secret}';
+    return 'Basic ${base64Encode(utf8.encode(raw))}';
   }
 }
