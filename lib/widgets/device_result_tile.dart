@@ -15,8 +15,11 @@ class DeviceResultTile extends StatelessWidget {
       if (result.model != null) result.model,
       if (result.serialNumber != null) 'SN: ${result.serialNumber}',
       if (result.firmwareVersion != null) 'FW: ${result.firmwareVersion}',
+      if (result.rtspOk != null) 'RTSP: ${result.rtspOk! ? 'OK' : 'BRAK'}',
+      if (result.authProfileName != null) 'profil: ${result.authProfileName}',
       if (result.country != null) result.country,
       if (result.organization != null) result.organization,
+      if (result.labels.isNotEmpty) 'tagi: ${result.labels.join(', ')}',
       if (result.error != null) result.error,
     ].join('  |  ');
 
@@ -27,7 +30,9 @@ class DeviceResultTile extends StatelessWidget {
         subtitle: Text(subtitle.isEmpty ? result.protocol : subtitle),
         trailing: result.hasOnvifInfo
             ? const Icon(Icons.verified, color: Colors.green)
-            : null,
+            : result.rtspOk == true
+                ? const Icon(Icons.network_check, color: Colors.green)
+                : null,
       ),
     );
   }
