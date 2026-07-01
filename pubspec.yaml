@@ -1,0 +1,20 @@
+name: onvif_scanner
+description: ONVIF, LAN and Shodan scanner for authorized CCTV audits.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  dio: ^5.7.0
+  xml: ^6.5.0
+  csv: ^6.0.0
+  path_provider: ^2.1.5
+  share_plus: ^10.1.2
+
+flutter:
+  uses-material-design: true
